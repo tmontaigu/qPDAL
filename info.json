@@ -1,0 +1,18 @@
+{
+	"type" : "Standard",
+	"name" : "qPDAL (Standard Plugin)",
+	"icon" : ":/CC/plugin/qPDAL/images/icon.png",
+	"description": "This is a description of the marvelous Example plugin. It does nothing.",
+	"authors" : [
+		{
+			"name" : "Thomas Montaigu",
+			"email" : "thomas.montaigu@laposte.net"
+		}
+	],
+	"maintainers" : [
+		{
+			"name" : "Thomas Montaigu",
+			"email" : "thomas.montaigu@laposte.net"
+		}
+	]
+}
