@@ -44,6 +44,7 @@
 #include "qPDAL.h"
 #include "ccPDALReaders.h"
 #include "ccPDALWriters.h"
+#include "ListSelectionDialog.h"
 
 
 bool startsWith(const std::string &str, const std::string &startStr)
@@ -53,6 +54,17 @@ bool startsWith(const std::string &str, const std::string &startStr)
 		return false;
 	}
 	return str.substr(0, startStr.size()) == startStr;
+}
+
+
+std::vector<QString> askForSelection(const std::vector<QString> &choices)
+{
+	QEventLoop loop;
+	ListSelectionDialog dm(choices);
+	dm.show();
+	QObject::connect(&dm, &ListSelectionDialog::finished, &loop, &QEventLoop::quit);
+	loop.exec();
+	return dm.checkedItems();
 }
 
 // Default constructor:
@@ -84,7 +96,8 @@ void qPDAL::onNewSelection(const ccHObject::Container &selectedEntities)
 	//	}
 
 	// For example - only enable our action if something is selected.
-	m_action->setEnabled(!selectedEntities.empty());
+	//m_action->setEnabled(!selectedEntities.empty());
+	m_action->setEnabled(true);
 }
 
 // This method returns all the 'actions' your plugin can perform.
@@ -122,6 +135,7 @@ void qPDAL::doAction()
 		return;
 	}
 
+	/*
 	pdal::RangeFilter rangeFilter;
 	pdal::Options rangeOptions;
 	rangeOptions.add("limits", "Z[:70]");
@@ -156,7 +170,7 @@ void qPDAL::doAction()
 	}
 
 	m_app->addToDB(r);
-
+	*/
 
 	// Force plugin loading.
 	pdal::StageFactory f(false);
@@ -171,16 +185,30 @@ void qPDAL::doAction()
 			{ return startsWith(stageName, "filters."); }
 	);
 
-	for (auto const &n : filtersNames)
+	std::vector<QString> qFiltersNames;
+	qFiltersNames.reserve(filtersNames.size());
+	std::transform(
+			filtersNames.begin(),
+			filtersNames.end(),
+			std::back_inserter(qFiltersNames),
+			[](const std::string &filterName)
+			{ return QString::fromStdString(filterName); }
+	);
+
+
+	std::vector<QString> selectedStages = askForSelection(qFiltersNames);
+	if (selectedStages.empty())
 	{
-		m_app->dispToConsole(n.c_str());
+		m_app->dispToConsole("Select a stage", ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		return;
 	}
+	std::string selectedStage = selectedStages.front().toStdString();
+	m_app->dispToConsole(QString("Stage Selected: %1").arg(selectedStages.front()));
 
-
-	std::unique_ptr<pdal::Stage> s = std::make_unique>(f.createStage(stageName));
+	std::unique_ptr<pdal::Stage> s = std::unique_ptr<pdal::Stage>(f.createStage(selectedStage));
 	if (!s)
 	{
-		std::cerr << "Unable to create stage " << stageName << "\n";
+		std::cerr << "Unable to create stage " << selectedStage << "\n";
 		return;
 	}
 
