@@ -22,7 +22,7 @@ if ( PLUGIN_QPDAL )
     # include_directories( ${LIB1_INCLUDE_DIR} )
 
     # PDAL library
-    find_package( PDAL 1.0.0 REQUIRED CONFIG )
+    find_package( PDAL 1.7.0 REQUIRED CONFIG )
 
     if ( NOT PDAL_FOUND )
         message( SEND_ERROR "PDAL package not found!")
