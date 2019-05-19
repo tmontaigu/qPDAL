@@ -7,12 +7,21 @@
 
 #include <ccPointCloud.h>
 
+static const pdal::PluginInfo s_CloudStreamWriterInfo
+		{
+				"writers.ccPointCloudStreamWriter",
+				"Get the result of a PDAL pipeline back into a ccPointCloud",
+				""
+		};
 
 
-class ccPointCloudStreamWriter : public pdal::Writer, public pdal::Streamable {
+class ccPointCloudStreamWriter : public pdal::Writer, public pdal::Streamable
+{
 public:
 	ccPointCloudStreamWriter(ccPointCloud *mCloud) : m_cloud(mCloud)
 	{}
+
+	ccPointCloudStreamWriter() = default;
 
 	std::string getName() const override
 	{
@@ -35,5 +44,6 @@ private:
 	ccPointCloud *m_cloud;
 };
 
+CREATE_STATIC_STAGE(ccPointCloudStreamWriter, s_CloudStreamWriterInfo);
 
 #endif //CLOUDCOMPAREPROJECTS_CCPDALWRITERS_H

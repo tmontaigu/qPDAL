@@ -7,15 +7,26 @@
 
 #include <ccPointCloud.h>
 
+static const pdal::PluginInfo s_CloudStreamReaderInfo
+		{
+				"readers.ccPointCloudStreamReader",
+				"Allow to use ccPointCloud as source for PDAL pipelines",
+				""
+		};
 
-class ccPointCloudStreamReader : public pdal::Reader, pdal::Streamable {
+
+class ccPointCloudStreamReader : public pdal::Reader, pdal::Streamable
+{
 public:
-	ccPointCloudStreamReader(ccPointCloud *mCloud) : m_cloud(mCloud)
+	explicit ccPointCloudStreamReader(ccPointCloud *mCloud) : m_cloud(mCloud)
 	{}
+
+	ccPointCloudStreamReader() = default;
+
 
 	std::string getName() const override
 	{
-		return "readers.ccPointCloudStreamReader";
+		return s_CloudStreamReaderInfo.name;
 	}
 
 private:
@@ -26,9 +37,14 @@ private:
 		ptr->registerDim(pdal::Dimension::Id::Z);
 	}
 
+
 private:
 	bool processOne(pdal::PointRef &point) override
 	{
+		if (!m_cloud)
+		{
+			return false;
+		}
 		const CCVector3 *ccPoint = m_cloud->getPoint(m_currentPoint);
 		point.setField(pdal::Dimension::Id::X, ccPoint->x);
 		point.setField(pdal::Dimension::Id::Y, ccPoint->y);
@@ -42,5 +58,7 @@ private:
 	unsigned m_currentPoint = 0;
 };
 
+
+CREATE_STATIC_STAGE(ccPointCloudStreamReader, s_CloudStreamReaderInfo);
 
 #endif //CLOUDCOMPAREPROJECTS_CCPDALREADERS_H
