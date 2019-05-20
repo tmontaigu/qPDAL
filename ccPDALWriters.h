@@ -29,10 +29,22 @@ public:
 	}
 
 private:
+	void write(const pdal::PointViewPtr ptr) override
+	{
+		ccLog::Print("MDR: %d", ptr->size());
+		m_cloud->reserve(m_cloud->size() + ptr->size());
+		for(size_t i = 0; i < ptr->size(); ++i) {
+			pdal::PointRef point(*ptr, i);
+			point.setPointId(i);
+			if (!processOne(point))
+				break;
+		}
+	}
+
 	bool processOne(pdal::PointRef &point) override
 	{
 		if (!m_cloud) {
-			return  false;
+			return false;
 		}
 		CCVector3 p(
 				point.getFieldAs<PointCoordinateType>(pdal::Dimension::Id::X),

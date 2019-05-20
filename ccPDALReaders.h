@@ -30,6 +30,23 @@ public:
 	}
 
 private:
+	pdal::point_count_t read(pdal::PointViewPtr view, pdal::point_count_t count) override
+	{
+		pdal::PointId idx = view->size();
+		pdal::point_count_t cnt = 0;
+		pdal::PointRef point(*view, idx);
+		while (cnt < m_cloud->size())
+		{
+			point.setPointId(idx);
+			if (!processOne(point))
+				break;
+			cnt++;
+			idx++;
+		}
+		return cnt;
+	}
+
+private:
 	void addDimensions(pdal::PointLayoutPtr ptr) override
 	{
 		ptr->registerDim(pdal::Dimension::Id::X);

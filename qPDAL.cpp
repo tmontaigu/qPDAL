@@ -266,15 +266,29 @@ void qPDAL::doAction()
 
 	writer.setInput(*s);
 
-	pdal::FixedPointTable t(1000);
-
-	try
-	{
-		writer.prepare(t);
-		writer.execute(t);
-	} catch (const std::exception& e) {
-		m_app->dispToConsole(QString::fromUtf8(e.what()), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+	if (writer.pipelineStreamable()) {
+		m_app->dispToConsole("[qPDAL] streaming mode");
+		pdal::FixedPointTable t(1000);
+		try
+		{
+			writer.prepare(t);
+			writer.execute(t);
+		} catch (const std::exception& e) {
+			m_app->dispToConsole(QString::fromUtf8(e.what()), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		}
+	} else {
+		m_app->dispToConsole("[qPDAL] Non-streaming mode");
+		pdal::PointTable t;
+		try
+		{
+			writer.prepare(t);
+			writer.execute(t);
+		} catch (const std::exception& e) {
+			m_app->dispToConsole(QString::fromUtf8(e.what()), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		}
 	}
+
+
 	m_app->addToDB(r);
 }
 
