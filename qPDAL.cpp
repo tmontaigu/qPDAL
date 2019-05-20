@@ -31,6 +31,8 @@
 //	 "description" is used as a tootip if the plugin has actions and is displayed in the plugin dialog
 //	 "authors", "maintainers", and "references" show up in the plugin dialog as well
 
+#include <map>
+
 #include <QtGui>
 #include <QEventLoop>
 #include <QFormLayout>
@@ -40,6 +42,9 @@
 #include <pdal/filters/RangeFilter.hpp>
 #include <pdal/PluginManager.hpp>
 #include <pdal/StageFactory.hpp>
+#include <pdal/PipelineManager.hpp>
+
+#include <json/json.h>
 
 #include "qPDAL.h"
 #include "ccPDALReaders.h"
@@ -109,15 +114,27 @@ QList<QAction *> qPDAL::getActions()
 	{
 		// Here we use the default plugin name, description, and icon,
 		// but each action should have its own.
-		m_action = new QAction(getName(), this);
-		m_action->setToolTip(getDescription());
+		m_action = new QAction("PDAL filter", this);
+		m_action->setToolTip("Apply a PDAL filter to the selected cloud");
 		m_action->setIcon(getIcon());
 
 		// Connect appropriate signal
 		connect(m_action, &QAction::triggered, this, &qPDAL::doAction);
 	}
 
-	return {m_action};
+	if (!m_executePipeline)
+	{
+		// Here we use the default plugin name, description, and icon,
+		// but each action should have its own.
+		m_executePipeline = new QAction("Execute Pipeline", this);
+		m_executePipeline->setToolTip("PDAL pipeline");
+		m_executePipeline->setIcon(getIcon());
+
+		// Connect appropriate signal
+		connect(m_executePipeline, &QAction::triggered, this, &qPDAL::executePipeline);
+	}
+
+	return {m_action, m_executePipeline};
 }
 
 // This is an example of an action's method called when the corresponding action
@@ -135,42 +152,9 @@ void qPDAL::doAction()
 		return;
 	}
 
-	/*
-	pdal::RangeFilter rangeFilter;
-	pdal::Options rangeOptions;
-	rangeOptions.add("limits", "Z[:70]");
-	rangeFilter.addOptions(rangeOptions);
-
-	const auto selected = m_app->getSelectedEntities();
-	const auto entity = selected.back();
-
-
-	if (entity->getClassID() != CC_TYPES::POINT_CLOUD)
-	{
+	if (m_app->getSelectedEntities().empty() || m_app->getSelectedEntities().front()->getClassID() != CC_TYPES::POINT_CLOUD) {
 		return;
 	}
-	ccPointCloud *cloud = ccHObjectCaster::ToPointCloud(entity);
-	ccPointCloudStreamReader streamer(cloud);
-
-
-	ccPointCloud *r = new ccPointCloud("lol");
-	ccPointCloudStreamWriter writer(r);
-
-	writer.setInput(rangeFilter);
-
-	rangeFilter.setInput(streamer);
-	pdal::FixedPointTable t(100);
-	try
-	{
-		writer.prepare(t);
-		writer.execute(t);
-	} catch (const std::exception &e)
-	{
-		m_app->dispToConsole(e.what());
-	}
-
-	m_app->addToDB(r);
-	*/
 
 	// Force plugin loading.
 	pdal::StageFactory f(false);
@@ -195,18 +179,21 @@ void qPDAL::doAction()
 			{ return QString::fromStdString(filterName); }
 	);
 
-
 	std::vector<QString> selectedStages = askForSelection(qFiltersNames);
 	if (selectedStages.empty())
 	{
 		m_app->dispToConsole("Select a stage", ccMainAppInterface::ERR_CONSOLE_MESSAGE);
 		return;
 	}
+
+
+
 	std::string selectedStage = selectedStages.front().toStdString();
 	m_app->dispToConsole(QString("Stage Selected: %1").arg(selectedStages.front()));
 
-	std::unique_ptr<pdal::Stage> s = std::unique_ptr<pdal::Stage>(f.createStage(selectedStage));
-	if (!s)
+	//std::unique_ptr<pdal::Stage> s = std::unique_ptr<pdal::Stage>(f.createStage(selectedStage));
+	pdal::Stage *s = f.createStage(selectedStage);
+	if (s == nullptr)
 	{
 		std::cerr << "Unable to create stage " << selectedStage << "\n";
 		return;
@@ -215,16 +202,83 @@ void qPDAL::doAction()
 	pdal::ProgramArgs args;
 	s->addAllArgs(args);
 
+	std::ostringstream ostr;
+	args.dump3(ostr);
+	std::string json = ostr.str();
+
+	Json::Reader jsonReader;
+	Json::Value array;
+	jsonReader.parse(json, array);
+
+
+	std::map<QString, QLineEdit*> optionInputs;
+
 	QWidget window;
 	QFormLayout form(&window);
-	QLineEdit *nameEdit = new QLineEdit;
-	form.addRow(tr("&Name:"), nameEdit);
+
+	// Intentionally skip the 3 last options for now
+	for (int i = array.size() - 1; i >= 3; --i)
+	{
+		QString optionName = QString::fromStdString(array[i]["name"].asString());
+		m_app->dispToConsole(optionName);
+		QLineEdit *optionEdit = new QLineEdit;
+		form.addRow(optionName, optionEdit);
+		optionInputs[optionName] = optionEdit;
+	}
+
+
+	QPushButton btn("Ok");
+	form.addRow(&btn);
 
 	QEventLoop loop;
-
-	QObject::connect(&window, &QWidget::close, &loop, &QEventLoop::quit);
-	m_app->dispToConsole("Fuck");
-
 	window.show();
+	QObject::connect(&btn, &QPushButton::clicked, &loop, &QEventLoop::quit);
 	loop.exec();
+
+	pdal::Options filterOptions;
+	for (const auto& optionInput: optionInputs)
+	{
+		if (!optionInput.second->text().isEmpty()) {
+			filterOptions.add(optionInput.first.toStdString(), optionInput.second->text().toStdString());
+			m_app->dispToConsole(QString("%1: \"%2\"").arg(optionInput.first).arg(optionInput.second->text()));
+		}
+	}
+
+	ccPointCloud *inputCloud = ccHObjectCaster::ToPointCloud(m_app->getSelectedEntities().front());
+	if (inputCloud == nullptr) {
+		m_app->dispToConsole("FK", ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		return;
+	}
+	ccPointCloudStreamReader reader(inputCloud);
+
+	s->setInput(reader);
+
+	try
+	{
+		s->setOptions(filterOptions);
+	} catch (const std::exception& e) {
+		m_app->dispToConsole(QString::fromUtf8(e.what()), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+		return;
+	}
+
+	ccPointCloud *r = new ccPointCloud("lol");
+	ccPointCloudStreamWriter writer(r);
+
+	writer.setInput(*s);
+
+	pdal::FixedPointTable t(1000);
+
+	try
+	{
+		writer.prepare(t);
+		writer.execute(t);
+	} catch (const std::exception& e) {
+		m_app->dispToConsole(QString::fromUtf8(e.what()), ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+	}
+	m_app->addToDB(r);
+}
+
+void qPDAL::executePipeline()
+{
+
 }

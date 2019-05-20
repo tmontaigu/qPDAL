@@ -59,6 +59,7 @@ public:
 private:
 	/*** ADD YOUR CUSTOM ACTIONS HERE ***/
 	void doAction();
+	void executePipeline();
 	
 	//! Default action
 	/** You can add as many actions as you want in a plugin.
@@ -66,6 +67,7 @@ private:
 		toolbar and an entry in the plugin menu.
 	**/
 	QAction* m_action;
+	QAction* m_executePipeline;
 };
 
 #endif

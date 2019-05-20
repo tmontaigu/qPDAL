@@ -31,6 +31,9 @@ public:
 private:
 	bool processOne(pdal::PointRef &point) override
 	{
+		if (!m_cloud) {
+			return  false;
+		}
 		CCVector3 p(
 				point.getFieldAs<PointCoordinateType>(pdal::Dimension::Id::X),
 				point.getFieldAs<PointCoordinateType>(pdal::Dimension::Id::Y),

@@ -12,14 +12,6 @@ if ( PLUGIN_QPDAL )
 	# Name the plugin
     project( qPDAL )
     
-    # load any subdirectories (see qAdditionalIO for an example)
-    # add_subdirectory( LIB1 )
-    
-    include( ../../CMakePluginTpl.cmake )
-    
-    # set dependencies to necessary libraries (see qPCV for an example)
-    # target_link_libraries( ${PROJECT_NAME} LIB1 )
-    # include_directories( ${LIB1_INCLUDE_DIR} )
 
     # PDAL library
     find_package( PDAL 1.7.0 REQUIRED CONFIG )
@@ -31,10 +23,19 @@ if ( PLUGIN_QPDAL )
         link_directories( ${PDAL_LIBRARY_DIRS} )
     endif()
 
+    set( JSON_ROOT_DIR "" CACHE PATH "Jsoncpp root dir (PDAL/vendor/jsoncpp/dist)" )
+    if( NOT JSON_ROOT_DIR )
+        message( WARNING "Jsoncpp root dir is not specified (JSON_ROOT_DIR)" )
+    else()
+        include_directories( ${JSON_ROOT_DIR} )
+    endif()
+
+    include( ../../CMakePluginTpl.cmake )
+
     # Link PDAL
     add_definitions( ${PDAL_DEFINITIONS} )
 
-    target_link_libraries( ${PROJECT_NAME} ${PDAL_LIBRARIES} )
+    target_link_libraries( ${PROJECT_NAME} ${PDAL_LIBRARIES} jsoncpp)
 
     if( WIN32 )
         if ( MSVC_VERSION GREATER_EQUAL 1900 ) # Visual Studio 2017
@@ -51,6 +52,6 @@ if ( PLUGIN_QPDAL )
             copy_files( "${PDAL_DLL_FILES}" ${CCVIEWER_DEST_FOLDER} )
         endif()
 
-        target_link_libraries( ${PROJECT_NAME} "pdal_util" )
+        target_link_libraries( ${PROJECT_NAME} "pdal_util")
     endif()
 endif()
